@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Open+Sans:wght@300;400;500;600;700&display=swap');
+
+@layer base {
+  body {
+    font-family: 'Open Sans', sans-serif;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Libre Baskerville', serif;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-gradient-to-r from-kumbo-green-700 to-kumbo-green-600 text-white px-6 py-3 rounded-xl font-semibold transform transition-all duration-300 hover:scale-105 hover:shadow-lg focus:ring-4 focus:ring-kumbo-green-200;
+  }
+  
+  .btn-secondary {
+    @apply bg-gradient-to-r from-kumbo-tan-300 to-kumbo-tan-400 text-kumbo-green-800 px-6 py-3 rounded-xl font-semibold transform transition-all duration-300 hover:scale-105 hover:shadow-lg;
+  }
+  
+  .card {
+    @apply bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 border border-gray-100;
+  }
+  
+  .input-field {
+    @apply w-full px-4 py-3 border-2 border-kumbo-green-200 rounded-xl focus:border-kumbo-green-500 focus:ring-2 focus:ring-kumbo-green-200 transition-all duration-300;
+  }
+  
+  .sidebar-item {
+    @apply w-full flex items-center space-x-3 px-4 py-3 rounded-xl mb-2 transition-all duration-200 text-kumbo-green-100 hover:bg-kumbo-green-700 hover:text-white;
+  }
+  
+  .sidebar-item-active {
+    @apply bg-kumbo-gold-500 text-white shadow-lg transform scale-105;
+  }
+  
+  .line-clamp-2 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+}
+
+@layer utilities {
+  .animate-bounce-subtle {
+    animation: bounceSubtle 0.6s ease-in-out;
+  }
+  
+  .text-shadow {
+    text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  
+  .backdrop-blur-subtle {
+    backdrop-filter: blur(8px);
+  }
+}
