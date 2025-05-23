@@ -274,36 +274,6 @@ const Header = ({ currentPage, setSidebarOpen }) => {
         </div>
       </div>
 
-      {/* Page-specific Action Bar (optional) */}
-      {currentPage === "search" && (
-        <div className="px-6 py-3 bg-gray-50 border-t border-gray-200">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">
-                <strong>1,247</strong> documents found
-              </span>
-              <div className="flex items-center space-x-2">
-                <span className="text-sm text-gray-500">Sort by:</span>
-                <select className="text-sm border-gray-200 rounded-lg focus:ring-kumbo-green-200 focus:border-kumbo-green-400">
-                  <option>Date (Newest)</option>
-                  <option>Date (Oldest)</option>
-                  <option>Name (A-Z)</option>
-                  <option>Size</option>
-                </select>
-              </div>
-            </div>
-            <div className="flex items-center space-x-2">
-              <button className="px-3 py-1 text-sm bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                Grid View
-              </button>
-              <button className="px-3 py-1 text-sm bg-kumbo-green-600 text-white rounded-lg hover:bg-kumbo-green-700 transition-colors">
-                List View
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {currentPage === "upload" && (
         <div className="px-6 py-3 bg-kumbo-green-50 border-t border-kumbo-green-200">
           <div className="flex items-center justify-between">

@@ -6,7 +6,7 @@ const Layout = ({ children, currentPage, setCurrentPage }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen max-w-screen bg-gray-50 overflow-hidden">
       {/* Sidebar */}
       <Sidebar
         currentPage={currentPage}
@@ -16,12 +16,14 @@ const Layout = ({ children, currentPage, setCurrentPage }) => {
       />
 
       {/* Main Content Area */}
-      <div className="lg:ml-64">
+      <div className="lg:ml-64 h-screen overflow-y-hidden">
         {/* Header */}
         <Header currentPage={currentPage} setSidebarOpen={setSidebarOpen} />
 
         {/* Page Content */}
-        <main className="animate-fade-in mt-24 overflow-x-hidden">{children}</main>
+        <main className="animate-fade-in mt-24 h-[85vh] overflow-y-auto">
+          {children}
+        </main>
       </div>
 
       {/* Mobile Sidebar Overlay */}

@@ -4,7 +4,12 @@ import DashboardPage from "./pages/DashboardPage";
 import Layout from "./components/common/Layout";
 import { AuthContext } from "./context/AuthContext";
 import { DocumentContext } from "./context/DocumentContext";
-import { mockDocuments, mockUsers } from "./data/mockdata";
+import { mockDocuments, mockUsers } from "./data/mockData";
+import UsersPage from "./pages/UsersPage";
+import SearchPage from "./pages/SearchPage";
+import ReportsPage from "./components/users/ReportsPage";
+import SettingsPage from "./pages/SettingsPage";
+import UploadPage from "./pages/UploadPage";
 
 function App() {
   // Authentication state
@@ -131,6 +136,16 @@ function App() {
     switch (currentPage) {
       case "dashboard":
         return <DashboardPage />;
+      case "users":
+        return <UsersPage />;
+      case "search":
+        return <SearchPage />;
+      case "reports":
+        return <ReportsPage />;
+      case "upload":
+        return <UploadPage />;
+      case "settings":
+        return <SettingsPage />;
       default:
         return <DashboardPage />;
     }

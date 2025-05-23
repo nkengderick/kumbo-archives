@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useDocuments } from "../context/DocumentContext";
-import { mockStats } from "../data/mockdata";
+import { mockStats } from "../data/mockData";
 
 const DashboardPage = () => {
   const { user } = useAuth();
