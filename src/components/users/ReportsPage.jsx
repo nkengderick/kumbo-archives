@@ -12,6 +12,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useDocuments } from "../../context/DocumentContext";
+import { useUsers } from "../../context/UserContext"; // Add this import
 import { useAnalytics } from "../../context/AnalyticsContext";
 import ChartCard from "../../components/reports/ChartCard";
 import StatsOverview from "../../components/reports/StatsOverview";
@@ -19,7 +20,8 @@ import ActivityChart from "../../components/reports/ActivityChart";
 import CategoryChart from "../../components/reports/CategoryChart";
 
 const ReportsPage = () => {
-  const { documents, users } = useDocuments();
+  const { documents } = useDocuments();
+  const { users, userStats, fetchUsers, fetchUserStats } = useUsers(); // Use UserContext
   const {
     dashboardData,
     detailedAnalytics,
@@ -42,6 +44,9 @@ const ReportsPage = () => {
   useEffect(() => {
     const loadAnalytics = async () => {
       await fetchDashboardAnalytics();
+      await fetchUsers(); // Fetch users from UserContext
+      await fetchUserStats(); // Fetch user stats
+
       if (reportType === "usage") {
         await fetchDetailedAnalytics(dateRange);
       }
@@ -51,42 +56,59 @@ const ReportsPage = () => {
     };
 
     loadAnalytics();
-  }, [dateRange, reportType, fetchDashboardAnalytics, fetchDetailedAnalytics, fetchUserAnalytics]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Calculate dynamic statistics from analytics context
+  // Calculate dynamic statistics from analytics context and user context
   const stats = {
     totalDocuments: dashboardData.totalDocuments || documents.length,
-    totalUsers: dashboardData.activeUsers || users.length,
-    totalViews: documents.reduce((sum, doc) => sum + (doc.viewCount || 0), 0),
+    totalUsers: dashboardData.activeUsers || userStats.total || users.length,
+    totalViews: documents.reduce(
+      (sum, doc) => sum + (doc.analytics?.viewCount || doc.viewCount || 0),
+      0
+    ),
     totalDownloads: documents.reduce(
-      (sum, doc) => sum + (doc.downloadCount || 0),
+      (sum, doc) =>
+        sum + (doc.analytics?.downloadCount || doc.downloadCount || 0),
       0
     ),
     storageUsed: dashboardData.storageUsed || "0 GB",
     storagePercentage: dashboardData.storagePercentage || 0,
     monthlyUploads: dashboardData.monthlyUploads || 0,
+    activeUsers: userStats.active || users.filter((u) => u.isActive).length,
+    adminUsers:
+      userStats.admins || users.filter((u) => u.role === "admin").length,
+    staffUsers:
+      userStats.staff || users.filter((u) => u.role === "staff").length,
+    researcherUsers:
+      userStats.researchers ||
+      users.filter((u) => u.role === "researcher").length,
   };
 
   // Get documents by category from analytics or fallback to local calculation
-  const documentsByCategory = dashboardData.popularCategories.length > 0
-    ? dashboardData.popularCategories.reduce((acc, cat) => {
-        acc[cat.name] = cat.count;
-        return acc;
-      }, {})
-    : documents.reduce((acc, doc) => {
-        acc[doc.category] = (acc[doc.category] || 0) + 1;
-        return acc;
-      }, {});
+  const documentsByCategory =
+    dashboardData.popularCategories.length > 0
+      ? dashboardData.popularCategories.reduce((acc, cat) => {
+          acc[cat.name] = cat.count;
+          return acc;
+        }, {})
+      : documents.reduce((acc, doc) => {
+          acc[doc.category] = (acc[doc.category] || 0) + 1;
+          return acc;
+        }, {});
 
   // Get activity data from analytics context
   const getActivityData = () => {
-    if (dashboardData.monthlyActivity && dashboardData.monthlyActivity.length > 0) {
+    if (
+      dashboardData.monthlyActivity &&
+      dashboardData.monthlyActivity.length > 0
+    ) {
       return dashboardData.monthlyActivity.map((item) => ({
         ...item,
         period: dateRange === "year" ? `2024-${item.month}` : item.month,
       }));
     }
-    
+
     // Fallback to sample data if no analytics data
     return [
       { month: "Jan", uploads: 12, downloads: 45, period: "Jan" },
@@ -108,6 +130,7 @@ const ReportsPage = () => {
       dashboardData,
       detailedAnalytics: reportType === "usage" ? detailedAnalytics : null,
       userAnalytics: reportType === "users" ? userAnalytics : null,
+      userStats, // Include user stats from UserContext
       documents: documents.length,
       users: users.length,
       lastUpdated,
@@ -130,6 +153,8 @@ const ReportsPage = () => {
 
   const handleRefresh = async () => {
     await refreshAllData();
+    await fetchUsers();
+    await fetchUserStats();
   };
 
   return (
@@ -141,7 +166,8 @@ const ReportsPage = () => {
             Reports & Analytics
           </h1>
           <p className="text-gray-600">
-            Comprehensive insights into your digital archives usage and performance
+            Comprehensive insights into your digital archives usage and
+            performance
           </p>
           {lastUpdated.dashboard && (
             <p className="text-sm text-gray-500 mt-1">
@@ -161,7 +187,11 @@ const ReportsPage = () => {
             className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
             title="Refresh Analytics Data"
           >
-            <RefreshCw className={`w-5 h-5 text-gray-600 ${isLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw
+              className={`w-5 h-5 text-gray-600 ${
+                isLoading ? "animate-spin" : ""
+              }`}
+            />
           </button>
 
           {/* Date Range Selector */}
@@ -265,74 +295,88 @@ const ReportsPage = () => {
               icon={Activity}
             >
               <div className="space-y-3">
-                {dashboardData.activities && dashboardData.activities.length > 0 ? (
-                  dashboardData.activities.slice(0, 5).map((activity, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                    >
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-kumbo-green-100 rounded-full flex items-center justify-center">
-                          <Activity className="w-4 h-4 text-kumbo-green-600" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-800">
-                            {activity.action || activity.type}
-                          </p>
-                          <p className="text-sm text-gray-600">
-                            {activity.user} • {activity.description || activity.details}
-                          </p>
-                        </div>
-                      </div>
-                      <span className="text-sm text-gray-500">
-                        {formatTimeAgo(activity.timestamp || activity.createdAt)}
-                      </span>
-                    </div>
-                  ))
-                ) : (
-                  // Fallback to document-based popular items
-                  documents
-                    .sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0))
-                    .slice(0, 5)
-                    .map((doc, index) => (
-                      <div
-                        key={doc.id}
-                        className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
-                      >
-                        <div className="flex items-center space-x-4">
-                          <div
-                            className={`w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold ${
-                              index === 0
-                                ? "bg-yellow-500"
-                                : index === 1
-                                ? "bg-gray-400"
-                                : index === 2
-                                ? "bg-amber-600"
-                                : "bg-gray-300"
-                            }`}
-                          >
-                            {index + 1}
+                {dashboardData.activities && dashboardData.activities.length > 0
+                  ? dashboardData.activities
+                      .slice(0, 5)
+                      .map((activity, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                        >
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 bg-kumbo-green-100 rounded-full flex items-center justify-center">
+                              <Activity className="w-4 h-4 text-kumbo-green-600" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-gray-800">
+                                {activity.action || activity.type}
+                              </p>
+                              <p className="text-sm text-gray-600">
+                                {activity.user} •{" "}
+                                {activity.description || activity.details}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="font-medium text-gray-800">
-                              {doc.title}
+                          <span className="text-sm text-gray-500">
+                            {formatTimeAgo(
+                              activity.timestamp || activity.createdAt
+                            )}
+                          </span>
+                        </div>
+                      ))
+                  : // Fallback to document-based popular items
+                    documents
+                      .sort(
+                        (a, b) =>
+                          (b.analytics?.viewCount || b.viewCount || 0) -
+                          (a.analytics?.viewCount || a.viewCount || 0)
+                      )
+                      .slice(0, 5)
+                      .map((doc, index) => (
+                        <div
+                          key={doc._id || doc.id}
+                          className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
+                        >
+                          <div className="flex items-center space-x-4">
+                            <div
+                              className={`w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold ${
+                                index === 0
+                                  ? "bg-yellow-500"
+                                  : index === 1
+                                  ? "bg-gray-400"
+                                  : index === 2
+                                  ? "bg-amber-600"
+                                  : "bg-gray-300"
+                              }`}
+                            >
+                              {index + 1}
+                            </div>
+                            <div>
+                              <p className="font-medium text-gray-800">
+                                {doc.title}
+                              </p>
+                              <p className="text-sm text-gray-600">
+                                {doc.category} •{" "}
+                                {doc.authorName ||
+                                  doc.author?.name ||
+                                  "Unknown"}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-semibold text-gray-800">
+                              {doc.analytics?.viewCount || doc.viewCount || 0}{" "}
+                              views
                             </p>
                             <p className="text-sm text-gray-600">
-                              {doc.category} • {doc.author}
+                              {doc.analytics?.downloadCount ||
+                                doc.downloadCount ||
+                                0}{" "}
+                              downloads
                             </p>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <p className="font-semibold text-gray-800">
-                            {doc.viewCount || 0} views
-                          </p>
-                          <p className="text-sm text-gray-600">
-                            {doc.downloadCount || 0} downloads
-                          </p>
-                        </div>
-                      </div>
-                    ))
-                )}
+                      ))}
               </div>
             </ChartCard>
           </div>
@@ -349,16 +393,28 @@ const ReportsPage = () => {
               icon={TrendingUp}
             >
               <div className="space-y-4">
-                {detailedAnalytics.documentTrends && detailedAnalytics.documentTrends.length > 0 ? (
+                {detailedAnalytics.documentTrends &&
+                detailedAnalytics.documentTrends.length > 0 ? (
                   detailedAnalytics.documentTrends.map((trend, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                    >
                       <div>
-                        <p className="font-medium text-gray-800">{trend.period}</p>
-                        <p className="text-sm text-gray-600">{trend.description}</p>
+                        <p className="font-medium text-gray-800">
+                          {trend.period}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          {trend.description}
+                        </p>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold text-gray-800">{trend.count}</p>
-                        <p className="text-sm text-green-600">+{trend.growth}%</p>
+                        <p className="font-semibold text-gray-800">
+                          {trend.count}
+                        </p>
+                        <p className="text-sm text-green-600">
+                          +{trend.growth}%
+                        </p>
                       </div>
                     </div>
                   ))
@@ -366,7 +422,9 @@ const ReportsPage = () => {
                   <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
                     <div className="text-center">
                       <Activity className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                      <p className="text-gray-600">Document trends data loading...</p>
+                      <p className="text-gray-600">
+                        Document trends data loading...
+                      </p>
                     </div>
                   </div>
                 )}
@@ -379,57 +437,116 @@ const ReportsPage = () => {
               icon={FileText}
             >
               <div className="space-y-3">
-                {detailedAnalytics.fileTypeDistribution && detailedAnalytics.fileTypeDistribution.length > 0 ? (
-                  detailedAnalytics.fileTypeDistribution.map((type, index) => (
-                    <div key={index} className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-4 h-4 rounded ${
-                          index === 0 ? 'bg-red-500' :
-                          index === 1 ? 'bg-blue-500' :
-                          index === 2 ? 'bg-green-500' : 'bg-purple-500'
-                        }`}></div>
-                        <span className="font-medium text-gray-800">{type.type}</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm text-gray-600">{type.count} files</span>
-                        <div className="w-16 bg-gray-200 rounded-full h-2">
-                          <div
-                            className={`h-2 rounded-full ${
-                              index === 0 ? 'bg-red-500' :
-                              index === 1 ? 'bg-blue-500' :
-                              index === 2 ? 'bg-green-500' : 'bg-purple-500'
-                            }`}
-                            style={{ width: `${type.percentage}%` }}
-                          ></div>
+                {detailedAnalytics.fileTypeDistribution &&
+                detailedAnalytics.fileTypeDistribution.length > 0
+                  ? detailedAnalytics.fileTypeDistribution.map(
+                      (type, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between"
+                        >
+                          <div className="flex items-center space-x-3">
+                            <div
+                              className={`w-4 h-4 rounded ${
+                                index === 0
+                                  ? "bg-red-500"
+                                  : index === 1
+                                  ? "bg-blue-500"
+                                  : index === 2
+                                  ? "bg-green-500"
+                                  : "bg-purple-500"
+                              }`}
+                            ></div>
+                            <span className="font-medium text-gray-800">
+                              {type.type}
+                            </span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-sm text-gray-600">
+                              {type.count} files
+                            </span>
+                            <div className="w-16 bg-gray-200 rounded-full h-2">
+                              <div
+                                className={`h-2 rounded-full ${
+                                  index === 0
+                                    ? "bg-red-500"
+                                    : index === 1
+                                    ? "bg-blue-500"
+                                    : index === 2
+                                    ? "bg-green-500"
+                                    : "bg-purple-500"
+                                }`}
+                                style={{ width: `${type.percentage}%` }}
+                              ></div>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  // Fallback data
-                  [
-                    { type: "PDF", count: 156, percentage: 65, color: "bg-red-500" },
-                    { type: "DOCX", count: 89, percentage: 37, color: "bg-blue-500" },
-                    { type: "XLSX", count: 45, percentage: 19, color: "bg-green-500" },
-                    { type: "Images", count: 23, percentage: 10, color: "bg-purple-500" },
-                  ].map((type, index) => (
-                    <div key={index} className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-4 h-4 rounded ${type.color}`}></div>
-                        <span className="font-medium text-gray-800">{type.type}</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm text-gray-600">{type.count} files</span>
-                        <div className="w-16 bg-gray-200 rounded-full h-2">
-                          <div
-                            className={`${type.color} h-2 rounded-full`}
-                            style={{ width: `${type.percentage}%` }}
-                          ></div>
+                      )
+                    )
+                  : // Fallback data based on actual documents
+                    documents.reduce((acc, doc) => {
+                      const fileType =
+                        doc.fileType ||
+                        doc.mimeType?.split("/")[1]?.toUpperCase() ||
+                        "Unknown";
+                      acc[fileType] = (acc[fileType] || 0) + 1;
+                      return acc;
+                    }, Object.create(null)) &&
+                    Object.entries(
+                      documents.reduce((acc, doc) => {
+                        const fileType =
+                          doc.fileType ||
+                          doc.mimeType?.split("/")[1]?.toUpperCase() ||
+                          "Unknown";
+                        acc[fileType] = (acc[fileType] || 0) + 1;
+                        return acc;
+                      }, {})
+                    )
+                      .slice(0, 4)
+                      .map(([type, count], index) => (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between"
+                        >
+                          <div className="flex items-center space-x-3">
+                            <div
+                              className={`w-4 h-4 rounded ${
+                                index === 0
+                                  ? "bg-red-500"
+                                  : index === 1
+                                  ? "bg-blue-500"
+                                  : index === 2
+                                  ? "bg-green-500"
+                                  : "bg-purple-500"
+                              }`}
+                            ></div>
+                            <span className="font-medium text-gray-800">
+                              {type}
+                            </span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-sm text-gray-600">
+                              {count} files
+                            </span>
+                            <div className="w-16 bg-gray-200 rounded-full h-2">
+                              <div
+                                className={`h-2 rounded-full ${
+                                  index === 0
+                                    ? "bg-red-500"
+                                    : index === 1
+                                    ? "bg-blue-500"
+                                    : index === 2
+                                    ? "bg-green-500"
+                                    : "bg-purple-500"
+                                }`}
+                                style={{
+                                  width: `${(count / documents.length) * 100}%`,
+                                }}
+                              ></div>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  ))
-                )}
+                      ))}
               </div>
             </ChartCard>
           </div>
@@ -442,24 +559,63 @@ const ReportsPage = () => {
               icon={Users}
             >
               <div className="space-y-3">
-                {detailedAnalytics.topContributors && detailedAnalytics.topContributors.length > 0 ? (
-                  detailedAnalytics.topContributors.map((contributor, index) => (
-                    <div key={index} className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-8 h-8 bg-kumbo-green-100 rounded-full flex items-center justify-center">
-                          <Users className="w-4 h-4 text-kumbo-green-600" />
+                {detailedAnalytics.topContributors &&
+                detailedAnalytics.topContributors.length > 0
+                  ? detailedAnalytics.topContributors.map(
+                      (contributor, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between"
+                        >
+                          <div className="flex items-center space-x-2">
+                            <div className="w-8 h-8 bg-kumbo-green-100 rounded-full flex items-center justify-center">
+                              <Users className="w-4 h-4 text-kumbo-green-600" />
+                            </div>
+                            <span className="text-sm font-medium text-gray-700">
+                              {contributor.name}
+                            </span>
+                          </div>
+                          <span className="text-sm text-gray-600">
+                            {contributor.contributions} docs
+                          </span>
                         </div>
-                        <span className="text-sm font-medium text-gray-700">{contributor.name}</span>
-                      </div>
-                      <span className="text-sm text-gray-600">{contributor.contributions} docs</span>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center py-4">
-                    <Users className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-gray-600 text-sm">Loading contributor data...</p>
-                  </div>
-                )}
+                      )
+                    )
+                  : // Fallback based on actual document authors
+                    documents.reduce((acc, doc) => {
+                      const authorName =
+                        doc.authorName || doc.author?.name || "Unknown";
+                      acc[authorName] = (acc[authorName] || 0) + 1;
+                      return acc;
+                    }, Object.create(null)) &&
+                    Object.entries(
+                      documents.reduce((acc, doc) => {
+                        const authorName =
+                          doc.authorName || doc.author?.name || "Unknown";
+                        acc[authorName] = (acc[authorName] || 0) + 1;
+                        return acc;
+                      }, {})
+                    )
+                      .sort(([, a], [, b]) => b - a)
+                      .slice(0, 5)
+                      .map(([name, count], index) => (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between"
+                        >
+                          <div className="flex items-center space-x-2">
+                            <div className="w-8 h-8 bg-kumbo-green-100 rounded-full flex items-center justify-center">
+                              <Users className="w-4 h-4 text-kumbo-green-600" />
+                            </div>
+                            <span className="text-sm font-medium text-gray-700">
+                              {name}
+                            </span>
+                          </div>
+                          <span className="text-sm text-gray-600">
+                            {count} docs
+                          </span>
+                        </div>
+                      ))}
               </div>
             </ChartCard>
 
@@ -469,43 +625,66 @@ const ReportsPage = () => {
               icon={BarChart3}
             >
               <div className="space-y-3">
-                {detailedAnalytics.departmentActivity && detailedAnalytics.departmentActivity.length > 0 ? (
-                  detailedAnalytics.departmentActivity.map((dept, index) => (
-                    <div key={index} className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-gray-700">{dept.name}</span>
-                        <span className="text-sm text-gray-600">{dept.activity}%</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-kumbo-green-500 h-2 rounded-full"
-                          style={{ width: `${dept.activity}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  // Fallback data
-                  [
-                    { name: "Administration", activity: 85 },
-                    { name: "Finance", activity: 72 },
-                    { name: "Cultural Affairs", activity: 58 },
-                    { name: "Public Works", activity: 43 },
-                  ].map((dept, index) => (
-                    <div key={index} className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-gray-700">{dept.name}</span>
-                        <span className="text-sm text-gray-600">{dept.activity}%</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-kumbo-green-500 h-2 rounded-full"
-                          style={{ width: `${dept.activity}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  ))
-                )}
+                {userStats.departmentDistribution &&
+                userStats.departmentDistribution.length > 0
+                  ? userStats.departmentDistribution
+                      .slice(0, 4)
+                      .map((dept, index) => (
+                        <div key={index} className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-gray-700">
+                              {dept._id}
+                            </span>
+                            <span className="text-sm text-gray-600">
+                              {dept.count} users
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div
+                              className="bg-kumbo-green-500 h-2 rounded-full"
+                              style={{
+                                width: `${
+                                  (dept.count / stats.totalUsers) * 100
+                                }%`,
+                              }}
+                            ></div>
+                          </div>
+                        </div>
+                      ))
+                  : // Fallback data based on users
+                    users.reduce((acc, user) => {
+                      const dept = user.department || "Unknown";
+                      acc[dept] = (acc[dept] || 0) + 1;
+                      return acc;
+                    }, Object.create(null)) &&
+                    Object.entries(
+                      users.reduce((acc, user) => {
+                        const dept = user.department || "Unknown";
+                        acc[dept] = (acc[dept] || 0) + 1;
+                        return acc;
+                      }, {})
+                    )
+                      .slice(0, 4)
+                      .map(([name, count], index) => (
+                        <div key={index} className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-gray-700">
+                              {name}
+                            </span>
+                            <span className="text-sm text-gray-600">
+                              {count} users
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div
+                              className="bg-kumbo-green-500 h-2 rounded-full"
+                              style={{
+                                width: `${(count / users.length) * 100}%`,
+                              }}
+                            ></div>
+                          </div>
+                        </div>
+                      ))}
               </div>
             </ChartCard>
           </div>
@@ -521,30 +700,53 @@ const ReportsPage = () => {
             icon={TrendingUp}
           >
             <div className="space-y-3">
-              {detailedAnalytics.popularDocuments && detailedAnalytics.popularDocuments.length > 0 ? (
-                detailedAnalytics.popularDocuments.map((doc, index) => (
-                  <div key={index} className="p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-medium text-gray-800">{doc.title}</h4>
-                      <span className="text-sm text-gray-600">{doc.views} views</span>
-                    </div>
-                    <p className="text-sm text-gray-600">{doc.category} • {doc.downloads} downloads</p>
-                  </div>
-                ))
-              ) : (
-                documents
-                  .sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0))
-                  .slice(0, 5)
-                  .map((doc, index) => (
-                    <div key={doc.id} className="p-3 bg-gray-50 rounded-lg">
+              {detailedAnalytics.popularDocuments &&
+              detailedAnalytics.popularDocuments.length > 0
+                ? detailedAnalytics.popularDocuments.map((doc, index) => (
+                    <div key={index} className="p-3 bg-gray-50 rounded-lg">
                       <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-medium text-gray-800">{doc.title}</h4>
-                        <span className="text-sm text-gray-600">{doc.viewCount || 0} views</span>
+                        <h4 className="font-medium text-gray-800">
+                          {doc.title}
+                        </h4>
+                        <span className="text-sm text-gray-600">
+                          {doc.views} views
+                        </span>
                       </div>
-                      <p className="text-sm text-gray-600">{doc.category} • {doc.downloadCount || 0} downloads</p>
+                      <p className="text-sm text-gray-600">
+                        {doc.category} • {doc.downloads} downloads
+                      </p>
                     </div>
                   ))
-              )}
+                : documents
+                    .sort(
+                      (a, b) =>
+                        (b.analytics?.viewCount || b.viewCount || 0) -
+                        (a.analytics?.viewCount || a.viewCount || 0)
+                    )
+                    .slice(0, 5)
+                    .map((doc, index) => (
+                      <div
+                        key={doc._id || index}
+                        className="p-3 bg-gray-50 rounded-lg"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-medium text-gray-800">
+                            {doc.title}
+                          </h4>
+                          <span className="text-sm text-gray-600">
+                            {doc.analytics?.viewCount || doc.viewCount || 0}{" "}
+                            views
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-600">
+                          {doc.category} •{" "}
+                          {doc.analytics?.downloadCount ||
+                            doc.downloadCount ||
+                            0}{" "}
+                          downloads
+                        </p>
+                      </div>
+                    ))}
             </div>
           </ChartCard>
 
@@ -574,7 +776,9 @@ const ReportsPage = () => {
             >
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="p-4 bg-gray-50 rounded-lg">
-                  <h4 className="font-semibold text-gray-800 mb-2">Total Storage</h4>
+                  <h4 className="font-semibold text-gray-800 mb-2">
+                    Total Storage
+                  </h4>
                   <p className="text-2xl font-bold text-kumbo-green-600 mb-1">
                     {stats.storageUsed}
                   </p>
@@ -584,11 +788,15 @@ const ReportsPage = () => {
                       style={{ width: `${stats.storagePercentage}%` }}
                     ></div>
                   </div>
-                  <p className="text-xs text-gray-500">{stats.storagePercentage}% used</p>
+                  <p className="text-xs text-gray-500">
+                    {stats.storagePercentage}% used
+                  </p>
                 </div>
 
                 <div className="p-4 bg-gray-50 rounded-lg">
-                  <h4 className="font-semibold text-gray-800 mb-2">Monthly Growth</h4>
+                  <h4 className="font-semibold text-gray-800 mb-2">
+                    Monthly Growth
+                  </h4>
                   <p className="text-2xl font-bold text-blue-600 mb-1">
                     +{stats.monthlyUploads}
                   </p>
@@ -596,11 +804,17 @@ const ReportsPage = () => {
                 </div>
 
                 <div className="p-4 bg-gray-50 rounded-lg">
-                  <h4 className="font-semibold text-gray-800 mb-2">Average Size</h4>
+                  <h4 className="font-semibold text-gray-800 mb-2">
+                    Average Size
+                  </h4>
                   <p className="text-2xl font-bold text-purple-600 mb-1">
-                    {stats.totalDocuments > 0 
-                      ? Math.round((parseFloat(stats.storageUsed) * 1000) / stats.totalDocuments) 
-                      : 0} MB
+                    {stats.totalDocuments > 0
+                      ? Math.round(
+                          (parseFloat(stats.storageUsed) * 1000) /
+                            stats.totalDocuments
+                        )
+                      : 0}{" "}
+                    MB
                   </p>
                   <p className="text-sm text-gray-600">Per document</p>
                 </div>
@@ -620,55 +834,69 @@ const ReportsPage = () => {
               icon={Users}
             >
               <div className="space-y-4">
-                {userAnalytics.activeUserStats && userAnalytics.activeUserStats.length > 0 && (
-                  userAnalytics.activeUserStats.map((user, index) => (
-                    <div key={index} className="p-4 bg-gray-50 rounded-lg">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 bg-kumbo-green-600 rounded-full flex items-center justify-center">
-                            <Users className="w-4 h-4 text-white" />
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-800">{user.name}</p>
-                            <p className="text-sm text-gray-600 capitalize">
-                              {user.role} • {user.department}
-                            </p>
-                          </div>
+                {users.slice(0, 6).map((user, index) => (
+                  <div
+                    key={user._id || index}
+                    className="p-4 bg-gray-50 rounded-lg"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-kumbo-green-600 rounded-full flex items-center justify-center">
+                          <Users className="w-4 h-4 text-white" />
                         </div>
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            user.status === "Active"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-red-100 text-red-700"
-                          }`}
-                        >
-                          {user.status}
-                        </span>
+                        <div>
+                          <p className="font-medium text-gray-800">
+                            {user.name}
+                          </p>
+                          <p className="text-sm text-gray-600 capitalize">
+                            {user.role} • {user.department}
+                          </p>
+                        </div>
                       </div>
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          user.isActive
+                            ? "bg-green-100 text-green-700"
+                            : "bg-red-100 text-red-700"
+                        }`}
+                      >
+                        {user.isActive ? "Active" : "Inactive"}
+                      </span>
+                    </div>
 
-                      <div className="grid grid-cols-3 gap-4 text-center">
-                        <div>
-                          <p className="text-lg font-bold text-gray-800">
-                            {Math.floor(Math.random() * 50) + 10}
-                          </p>
-                          <p className="text-xs text-gray-600">Documents Viewed</p>
-                        </div>
-                        <div>
-                          <p className="text-lg font-bold text-gray-800">
-                            {Math.floor(Math.random() * 20) + 5}
-                          </p>
-                          <p className="text-xs text-gray-600">Downloads</p>
-                        </div>
-                        <div>
-                          <p className="text-lg font-bold text-gray-800">
-                            {Math.floor(Math.random() * 10) + 1}h
-                          </p>
-                          <p className="text-xs text-gray-600">Time Active</p>
-                        </div>
+                    <div className="grid grid-cols-3 gap-4 text-center">
+                      <div>
+                        <p className="text-lg font-bold text-gray-800">
+                          {user.documentsCreated ||
+                            Math.floor(Math.random() * 50) + 10}
+                        </p>
+                        <p className="text-xs text-gray-600">
+                          Documents Created
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-lg font-bold text-gray-800">
+                          {user.documentsAccessed ||
+                            Math.floor(Math.random() * 20) + 5}
+                        </p>
+                        <p className="text-xs text-gray-600">
+                          Documents Accessed
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-lg font-bold text-gray-800">
+                          {user.lastActivity
+                            ? Math.floor(
+                                (new Date() - new Date(user.lastActivity)) /
+                                  (1000 * 60 * 60)
+                              ) + "h"
+                            : Math.floor(Math.random() * 10) + 1 + "h"}
+                        </p>
+                        <p className="text-xs text-gray-600">Last Active</p>
                       </div>
                     </div>
-                  ))
-                )}
+                  </div>
+                ))}
               </div>
             </ChartCard>
           </div>
@@ -681,53 +909,67 @@ const ReportsPage = () => {
               icon={Shield}
             >
               <div className="space-y-3">
-                {userAnalytics.usersByDepartment && userAnalytics.usersByDepartment.length > 0 ? (
-                  userAnalytics.usersByDepartment.map((role, index) => (
-                    <div key={index} className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <div className={`w-3 h-3 rounded ${
-                          index === 0 ? 'bg-red-500' :
-                          index === 1 ? 'bg-blue-500' : 'bg-green-500'
-                        }`}></div>
-                        <span className="font-medium text-gray-800">{role.name}</span>
+                {userStats.roleDistribution &&
+                userStats.roleDistribution.length > 0
+                  ? userStats.roleDistribution.map((role, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <div
+                            className={`w-3 h-3 rounded ${
+                              index === 0
+                                ? "bg-red-500"
+                                : index === 1
+                                ? "bg-blue-500"
+                                : "bg-green-500"
+                            }`}
+                          ></div>
+                          <span className="font-medium text-gray-800 capitalize">
+                            {role._id}
+                          </span>
+                        </div>
+                        <span className="text-sm text-gray-600">
+                          {role.count} users
+                        </span>
                       </div>
-                      <span className="text-sm text-gray-600">{role.count} users</span>
-                    </div>
-                  ))
-                ) : (
-                  // Fallback role distribution
-                  [
-                    {
-                      role: "Admin",
-                      count: stats.totalUsers > 0
-                        ? users.filter((u) => u.role === "admin").length
-                        : 1,
-                      color: "bg-red-500",
-                    },
-                    {
-                      role: "Staff",
-                      count: stats.totalUsers > 0
-                        ? users.filter((u) => u.role === "staff").length
-                        : 2,
-                      color: "bg-blue-500",
-                    },
-                    {
-                      role: "Researcher",
-                      count: stats.totalUsers > 0
-                        ? users.filter((u) => u.role === "researcher").length
-                        : 1,
-                      color: "bg-green-500",
-                    },
-                  ].map((role, index) => (
-                    <div key={index} className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <div className={`w-3 h-3 rounded ${role.color}`}></div>
-                        <span className="font-medium text-gray-800">{role.role}</span>
+                    ))
+                  : // Fallback role distribution
+                    [
+                      {
+                        role: "Admin",
+                        count: stats.adminUsers,
+                        color: "bg-red-500",
+                      },
+                      {
+                        role: "Staff",
+                        count: stats.staffUsers,
+                        color: "bg-blue-500",
+                      },
+                      {
+                        role: "Researcher",
+                        count: stats.researcherUsers,
+                        color: "bg-green-500",
+                      },
+                    ].map((role, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <div
+                            className={`w-3 h-3 rounded ${role.color}`}
+                          ></div>
+                          <span className="font-medium text-gray-800">
+                            {role.role}
+                          </span>
+                        </div>
+                        <span className="text-sm text-gray-600">
+                          {role.count} users
+                        </span>
                       </div>
-                      <span className="text-sm text-gray-600">{role.count} users</span>
-                    </div>
-                  ))
-                )}
+                    ))}
               </div>
             </ChartCard>
 
@@ -737,43 +979,45 @@ const ReportsPage = () => {
               icon={Activity}
             >
               <div className="space-y-3">
-                {userAnalytics.userTrends && userAnalytics.userTrends.length > 0 ? (
-                  userAnalytics.userTrends.map((trend, index) => (
-                    <div key={index} className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-gray-700">{trend.period}</span>
-                        <span className="text-sm text-gray-600">{trend.activeUsers} users</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-kumbo-green-500 h-2 rounded-full"
-                          style={{ width: `${trend.percentage}%` }}
-                        ></div>
-                      </div>
+                {[
+                  {
+                    frequency: "Daily",
+                    count: Math.floor(stats.activeUsers * 0.4),
+                    percentage: 40,
+                  },
+                  {
+                    frequency: "Weekly",
+                    count: Math.floor(stats.activeUsers * 0.3),
+                    percentage: 30,
+                  },
+                  {
+                    frequency: "Monthly",
+                    count: Math.floor(stats.activeUsers * 0.2),
+                    percentage: 20,
+                  },
+                  {
+                    frequency: "Rarely",
+                    count: Math.floor(stats.activeUsers * 0.1),
+                    percentage: 10,
+                  },
+                ].map((freq, index) => (
+                  <div key={index} className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700">
+                        {freq.frequency}
+                      </span>
+                      <span className="text-sm text-gray-600">
+                        {freq.count} users
+                      </span>
                     </div>
-                  ))
-                ) : (
-                  // Fallback engagement data
-                  [
-                    { frequency: "Daily", count: 8, percentage: 80 },
-                    { frequency: "Weekly", count: 4, percentage: 40 },
-                    { frequency: "Monthly", count: 2, percentage: 20 },
-                    { frequency: "Rarely", count: 1, percentage: 10 },
-                  ].map((freq, index) => (
-                    <div key={index} className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-gray-700">{freq.frequency}</span>
-                        <span className="text-sm text-gray-600">{freq.count} users</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-kumbo-green-500 h-2 rounded-full"
-                          style={{ width: `${freq.percentage}%` }}
-                        ></div>
-                      </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-kumbo-green-500 h-2 rounded-full"
+                        style={{ width: `${freq.percentage}%` }}
+                      ></div>
                     </div>
-                  ))
-                )}
+                  </div>
+                ))}
               </div>
             </ChartCard>
 
@@ -783,43 +1027,74 @@ const ReportsPage = () => {
               icon={Users}
             >
               <div className="space-y-3">
-                {userAnalytics.usersByDepartment && userAnalytics.usersByDepartment.length > 0 ? (
-                  userAnalytics.usersByDepartment.slice(0, 4).map((dept, index) => (
-                    <div key={index} className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700">{dept.department}</span>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm text-gray-600">{dept.count}</span>
-                        <div className="w-12 bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-blue-500 h-2 rounded-full"
-                            style={{ width: `${(dept.count / stats.totalUsers) * 100}%` }}
-                          ></div>
+                {userStats.departmentDistribution &&
+                userStats.departmentDistribution.length > 0
+                  ? userStats.departmentDistribution
+                      .slice(0, 4)
+                      .map((dept, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between"
+                        >
+                          <span className="text-sm font-medium text-gray-700">
+                            {dept._id}
+                          </span>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-sm text-gray-600">
+                              {dept.count}
+                            </span>
+                            <div className="w-12 bg-gray-200 rounded-full h-2">
+                              <div
+                                className="bg-blue-500 h-2 rounded-full"
+                                style={{
+                                  width: `${
+                                    (dept.count / stats.totalUsers) * 100
+                                  }%`,
+                                }}
+                              ></div>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  // Fallback department data
-                  [
-                    { name: "Administration", count: 5 },
-                    { name: "Finance", count: 3 },
-                    { name: "Cultural Affairs", count: 2 },
-                    { name: "Public Works", count: 2 },
-                  ].map((dept, index) => (
-                    <div key={index} className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700">{dept.name}</span>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm text-gray-600">{dept.count}</span>
-                        <div className="w-12 bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-blue-500 h-2 rounded-full"
-                            style={{ width: `${(dept.count / (stats.totalUsers || 12)) * 100}%` }}
-                          ></div>
+                      ))
+                  : // Fallback department data
+                    users.reduce((acc, user) => {
+                      const dept = user.department || "Unknown";
+                      acc[dept] = (acc[dept] || 0) + 1;
+                      return acc;
+                    }, Object.create(null)) &&
+                    Object.entries(
+                      users.reduce((acc, user) => {
+                        const dept = user.department || "Unknown";
+                        acc[dept] = (acc[dept] || 0) + 1;
+                        return acc;
+                      }, {})
+                    )
+                      .slice(0, 4)
+                      .map(([name, count], index) => (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between"
+                        >
+                          <span className="text-sm font-medium text-gray-700">
+                            {name}
+                          </span>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-sm text-gray-600">
+                              {count}
+                            </span>
+                            <div className="w-12 bg-gray-200 rounded-full h-2">
+                              <div
+                                className="bg-blue-500 h-2 rounded-full"
+                                style={{
+                                  width: `${
+                                    (count / (stats.totalUsers || 12)) * 100
+                                  }%`,
+                                }}
+                              ></div>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  ))
-                )}
+                      ))}
               </div>
             </ChartCard>
           </div>
@@ -880,11 +1155,15 @@ const ReportsPage = () => {
             <div className="flex items-center space-x-3">
               <Activity className="w-5 h-5 text-gray-500" />
               <div>
-                <p className="text-sm font-medium text-gray-800">Analytics Data Status</p>
+                <p className="text-sm font-medium text-gray-800">
+                  Analytics Data Status
+                </p>
                 <p className="text-xs text-gray-600">
                   Dashboard: {formatTimeAgo(lastUpdated.dashboard)}
-                  {lastUpdated.detailed && ` • Detailed: ${formatTimeAgo(lastUpdated.detailed)}`}
-                  {lastUpdated.users && ` • Users: ${formatTimeAgo(lastUpdated.users)}`}
+                  {lastUpdated.detailed &&
+                    ` • Detailed: ${formatTimeAgo(lastUpdated.detailed)}`}
+                  {lastUpdated.users &&
+                    ` • Users: ${formatTimeAgo(lastUpdated.users)}`}
                 </p>
               </div>
             </div>

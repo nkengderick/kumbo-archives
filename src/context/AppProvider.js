@@ -1,14 +1,17 @@
 import { AnalyticsProvider } from "./AnalyticsContext";
 import { AuthProvider } from "./AuthContext";
 import { DocumentProvider } from "./DocumentContext";
+import { UserProvider } from "./UserContext";
 
 // Main App Provider that combines all contexts
 export const AppProvider = ({ children }) => {
   return (
     <AuthProvider>
-      <DocumentProvider>
-        <AnalyticsProvider>{children}</AnalyticsProvider>
-      </DocumentProvider>
+      <UserProvider>
+        <DocumentProvider>
+          <AnalyticsProvider>{children}</AnalyticsProvider>
+        </DocumentProvider>
+      </UserProvider>
     </AuthProvider>
   );
 };

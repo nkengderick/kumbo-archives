@@ -87,11 +87,9 @@ function App() {
             <Route
               path="/documents/:id"
               element={
-                <ProtectedRoute>
                   <LayoutWrapper>
                     <DocumentDetailPage />
                   </LayoutWrapper>
-                </ProtectedRoute>
               }
             />
 
@@ -101,7 +99,7 @@ function App() {
               element={
                 <ProtectedRoute>
                   <LayoutWrapper>
-                    <SearchPage />
+                    <DocumentsPage />
                   </LayoutWrapper>
                 </ProtectedRoute>
               }

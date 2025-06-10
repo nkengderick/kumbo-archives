@@ -363,7 +363,8 @@ const LoginPage = () => {
             </p>
             <p className="text-xs text-yellow-600">
               API:{" "}
-              {process.env.REACT_APP_API_URL || "http://localhost:5000/api/v1"}
+              {process.env.REACT_APP_API_URL ||
+                "https://kumbo-archives-server.onrender.com/api/v1"}
             </p>
             <p className="text-xs text-yellow-600">
               All demo users have password:{" "}
