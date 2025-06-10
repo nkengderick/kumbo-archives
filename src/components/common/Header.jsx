@@ -16,7 +16,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useDocuments } from "../../context/DocumentContext";
 
 const Header = ({ currentPage, setSidebarOpen }) => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { notifications, removeNotification } = useDocuments();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -111,7 +111,7 @@ const Header = ({ currentPage, setSidebarOpen }) => {
               className="relative p-2 text-gray-600 hover:text-kumbo-green-600 hover:bg-gray-100 rounded-lg transition-all duration-200"
             >
               <Bell className="w-5 h-5" />
-              {notifications.length > 0 && (
+              {notifications?.length > 0 && (
                 <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center animate-bounce-subtle">
                   {notifications.length}
                 </span>
@@ -136,7 +136,7 @@ const Header = ({ currentPage, setSidebarOpen }) => {
                 </div>
 
                 <div className="max-h-96 overflow-y-auto">
-                  {notifications.length === 0 ? (
+                  {notifications?.length === 0 ? (
                     <div className="p-6 text-center text-gray-500">
                       <Bell className="w-8 h-8 mx-auto mb-2 text-gray-300" />
                       <p>No new notifications</p>
@@ -176,7 +176,7 @@ const Header = ({ currentPage, setSidebarOpen }) => {
                   )}
                 </div>
 
-                {notifications.length > 0 && (
+                {notifications?.length > 0 && (
                   <div className="p-4 border-t border-gray-100">
                     <button className="w-full text-sm text-kumbo-green-600 hover:text-kumbo-green-700 transition-colors">
                       Mark all as read
@@ -247,8 +247,7 @@ const Header = ({ currentPage, setSidebarOpen }) => {
 
                   <button
                     onClick={() => {
-                      setShowUserMenu(false);
-                      // Handle logout - this would typically call the logout function
+                      logout();
                     }}
                     className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center space-x-2"
                   >

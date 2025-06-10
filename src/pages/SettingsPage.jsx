@@ -1,377 +1,447 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
-  User,
-  Bell,
-  Shield,
-  Database,
-  Palette,
-  Save,
-  AlertCircle,
-  CheckCircle,
+  Search,
+  Filter,
+  Grid,
+  List,
+  FileText,
+  X,
+  ChevronDown,
+  Loader,
 } from "lucide-react";
-import { useAuth } from "../context/AuthContext";
-import SettingsSection from "../components/settings/SettingsSection";
-import ProfileSettings from "../components/settings/ProfileSettings";
-import NotificationSettings from "../components/settings/NotificationSettings";
-import SecuritySettings from "../components/settings/SecuritySettings";
-import SystemSettings from "../components/settings/SystemSettings";
+import { useDocuments } from "../context/DocumentContext";
+import DocumentCard from "../components/documents/DocumentCard";
+import DocumentList from "../components/documents/DocumentList";
+import SearchFilters from "../components/documents/SearchFilters";
 
-const SettingsPage = () => {
-  const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState("profile");
-  const [hasChanges, setHasChanges] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saveMessage, setSaveMessage] = useState("");
+const SearchPage = () => {
+  const {
+    documents,
+    searchResults,
+    isLoading,
+    // eslint-disable-next-line no-unused-vars
+    searchQuery: contextSearchQuery,
+    filters: contextFilters,
+    pagination,
+    categories,
+    fetchDocuments,
+    searchDocuments,
+    fetchCategories,
+    setFilters,
+    clearFilters: contextClearFilters,
+    goToPage,
+  } = useDocuments();
 
-  const tabs = [
-    {
-      id: "profile",
-      label: "Profile",
-      icon: User,
-      description: "Personal information and preferences",
-    },
-    {
-      id: "notifications",
-      label: "Notifications",
-      icon: Bell,
-      description: "Email and system notifications",
-    },
-    {
-      id: "security",
-      label: "Security",
-      icon: Shield,
-      description: "Password and security settings",
-    },
-    {
-      id: "appearance",
-      label: "Appearance",
-      icon: Palette,
-      description: "Theme and display options",
-    },
-    ...(user?.role === "admin"
-      ? [
-          {
-            id: "system",
-            label: "System",
-            icon: Database,
-            description: "System-wide configurations",
-          },
-        ]
-      : []),
-  ];
+  const [localSearchQuery, setLocalSearchQuery] = useState("");
+  const [viewMode, setViewMode] = useState("grid"); // 'grid' or 'list'
+  const [sortBy, setSortBy] = useState("date-desc");
+  const [showFilters, setShowFilters] = useState(false);
+  const [isSearchMode, setIsSearchMode] = useState(false);
 
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      setSaveMessage("Settings saved successfully!");
-      setHasChanges(false);
-      setTimeout(() => setSaveMessage(""), 3000);
-    } catch (error) {
-      setSaveMessage("Error saving settings. Please try again.");
-    } finally {
-      setSaving(false);
-    }
-  };
+  // Local filter states that sync with context
+  const [localFilters, setLocalFilters] = useState({
+    category: "",
+    department: "",
+    dateRange: "",
+    fileType: "",
+    author: "",
+  });
 
-  const renderTabContent = () => {
-    switch (activeTab) {
-      case "profile":
-        return <ProfileSettings onchange={() => setHasChanges(true)} />;
-      case "notifications":
-        return <NotificationSettings onchange={() => setHasChanges(true)} />;
-      case "security":
-        return <SecuritySettings onchange={() => setHasChanges(true)} />;
-      case "appearance":
-        return <AppearanceSettings onchange={() => setHasChanges(true)} />;
-      case "system":
-        return user?.role === "admin" ? (
-          <SystemSettings onchange={() => setHasChanges(true)} />
-        ) : null;
-      default:
-        return <ProfileSettings onchange={() => setHasChanges(true)} />;
-    }
-  };
+  // Fetch initial data on mount
+  useEffect(() => {
+    const loadInitialData = async () => {
+      console.log("Starting to load initial data...");
+      try {
+        console.log("Fetching categories...");
+        await fetchCategories();
+        console.log("Categories fetched successfully");
 
-  const AppearanceSettings = ({ onchange }) => {
-    const [settings, setSettings] = useState({
-      theme: "light",
-      language: "en",
-      dateFormat: "MM/DD/YYYY",
-      timezone: "Africa/Douala",
-      compactView: false,
-      showFileIcons: true,
-      animationsEnabled: true,
-    });
-
-    const updateSetting = (key, value) => {
-      setSettings((prev) => ({ ...prev, [key]: value }));
-      onchange();
+        console.log("Fetching documents...");
+        await fetchDocuments();
+        console.log("Documents fetched successfully");
+      } catch (error) {
+        console.error("Failed to load initial data:", error);
+      }
     };
 
-    return (
-      <div className="space-y-6">
-        <SettingsSection
-          title="Display Preferences"
-          description="Customize how the interface looks and feels"
-        >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Theme Selection */}
-            <div className="space-y-3">
-              <label className="block text-sm font-medium text-gray-700">
-                Theme
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  {
-                    value: "light",
-                    label: "Light",
-                    preview: "bg-white border-gray-200",
-                  },
-                  {
-                    value: "dark",
-                    label: "Dark",
-                    preview: "bg-gray-800 border-gray-600",
-                  },
-                ].map((theme) => (
-                  <label
-                    key={theme.value}
-                    className={`relative flex items-center p-4 border-2 rounded-xl cursor-pointer transition-all ${
-                      settings.theme === theme.value
-                        ? "border-kumbo-green-500 bg-kumbo-green-50"
-                        : "border-gray-200 hover:border-gray-300"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="theme"
-                      value={theme.value}
-                      checked={settings.theme === theme.value}
-                      onChange={(e) => updateSetting("theme", e.target.value)}
-                      className="sr-only"
-                    />
-                    <div
-                      className={`w-8 h-6 rounded ${theme.preview} mr-3 border`}
-                    ></div>
-                    <span className="font-medium text-gray-800">
-                      {theme.label}
-                    </span>
-                    {settings.theme === theme.value && (
-                      <CheckCircle className="w-5 h-5 text-kumbo-green-600 absolute top-2 right-2" />
-                    )}
-                  </label>
-                ))}
-              </div>
-            </div>
+    // Only load if we don't already have documents
+    if (documents.length === 0 && !isLoading) {
+      loadInitialData();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array to run only once
 
-            {/* Language */}
-            <div className="space-y-3">
-              <label className="block text-sm font-medium text-gray-700">
-                Language
-              </label>
-              <select
-                value={settings.language}
-                onChange={(e) => updateSetting("language", e.target.value)}
-                className="input-field"
-              >
-                <option value="en">English</option>
-                <option value="fr">Français</option>
-              </select>
-            </div>
+  // Sync local filters with context filters
+  useEffect(() => {
+    setLocalFilters({
+      category: contextFilters.category || "",
+      department: contextFilters.department || "",
+      dateRange: "", // This needs to be mapped from contextFilters
+      fileType: contextFilters.fileType || "",
+      author: contextFilters.author || "",
+    });
+  }, [contextFilters]);
 
-            {/* Date Format */}
-            <div className="space-y-3">
-              <label className="block text-sm font-medium text-gray-700">
-                Date Format
-              </label>
-              <select
-                value={settings.dateFormat}
-                onChange={(e) => updateSetting("dateFormat", e.target.value)}
-                className="input-field"
-              >
-                <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-                <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-                <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-              </select>
-            </div>
+  // Handle search with debouncing
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (localSearchQuery.trim()) {
+        setIsSearchMode(true);
+        searchDocuments(localSearchQuery, {
+          ...contextFilters,
+          sortBy,
+        });
+      } else {
+        setIsSearchMode(false);
+        fetchDocuments({
+          ...contextFilters,
+          sortBy,
+        });
+      }
+    }, 300);
 
-            {/* Timezone */}
-            <div className="space-y-3">
-              <label className="block text-sm font-medium text-gray-700">
-                Timezone
-              </label>
-              <select
-                value={settings.timezone}
-                onChange={(e) => updateSetting("timezone", e.target.value)}
-                className="input-field"
-              >
-                <option value="Africa/Douala">Africa/Douala (GMT+1)</option>
-                <option value="UTC">UTC (GMT+0)</option>
-                <option value="Europe/London">Europe/London (GMT+0)</option>
-                <option value="America/New_York">
-                  America/New_York (GMT-5)
-                </option>
-              </select>
-            </div>
-          </div>
-        </SettingsSection>
+    return () => clearTimeout(timeoutId);
+  }, [
+    localSearchQuery,
+    contextFilters,
+    sortBy,
+    searchDocuments,
+    fetchDocuments,
+  ]);
 
-        <SettingsSection
-          title="Interface Options"
-          description="Adjust interface behavior and visual elements"
-        >
-          <div className="space-y-4">
-            {[
-              {
-                key: "compactView",
-                label: "Compact View",
-                description: "Use a more condensed layout to show more content",
-              },
-              {
-                key: "showFileIcons",
-                label: "Show File Type Icons",
-                description:
-                  "Display icons for different file types in document listings",
-              },
-              {
-                key: "animationsEnabled",
-                label: "Enable Animations",
-                description:
-                  "Use smooth transitions and animations throughout the interface",
-              },
-            ].map((option) => (
-              <label
-                key={option.key}
-                className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-              >
-                <div>
-                  <p className="font-medium text-gray-800">{option.label}</p>
-                  <p className="text-sm text-gray-600">{option.description}</p>
-                </div>
-                <div className="relative">
-                  <input
-                    type="checkbox"
-                    checked={settings[option.key]}
-                    onChange={(e) =>
-                      updateSetting(option.key, e.target.checked)
-                    }
-                    className="sr-only"
-                  />
-                  <div
-                    className={`w-12 h-6 rounded-full transition-colors ${
-                      settings[option.key]
-                        ? "bg-kumbo-green-500"
-                        : "bg-gray-300"
-                    }`}
-                  >
-                    <div
-                      className={`w-5 h-5 bg-white rounded-full shadow transform transition-transform ${
-                        settings[option.key]
-                          ? "translate-x-6"
-                          : "translate-x-0.5"
-                      } mt-0.5`}
-                    ></div>
-                  </div>
-                </div>
-              </label>
-            ))}
-          </div>
-        </SettingsSection>
-      </div>
-    );
+  // Apply local filters to context
+  const applyFilters = useCallback(
+    (newFilters) => {
+      const contextFilterFormat = {
+        category: newFilters.category === "All" ? "" : newFilters.category,
+        department:
+          newFilters.department === "All" ? "" : newFilters.department,
+        fileType: newFilters.fileType === "All" ? "" : newFilters.fileType,
+        author: newFilters.author === "All" ? "" : newFilters.author,
+        // Map date range to actual dates
+        dateFrom: getDateFromRange(newFilters.dateRange),
+        dateTo: newFilters.dateRange === "All" ? "" : new Date().toISOString(),
+      };
+
+      setFilters(contextFilterFormat);
+    },
+    [setFilters]
+  );
+
+  // Helper function to convert date range to actual date
+  const getDateFromRange = (dateRange) => {
+    if (dateRange === "All") return "";
+
+    const now = new Date();
+    const date = new Date();
+
+    switch (dateRange) {
+      case "week":
+        date.setDate(now.getDate() - 7);
+        break;
+      case "month":
+        date.setMonth(now.getMonth() - 1);
+        break;
+      case "quarter":
+        date.setMonth(now.getMonth() - 3);
+        break;
+      case "year":
+        date.setFullYear(now.getFullYear() - 1);
+        break;
+      default:
+        return "";
+    }
+
+    return date.toISOString();
   };
 
+  // Handle filter changes
+  const handleFilterChange = (newFilters) => {
+    setLocalFilters(newFilters);
+    applyFilters(newFilters);
+  };
+
+  // Clear all filters
+  const clearAllFilters = () => {
+    const clearedFilters = {
+      category: "All",
+      department: "All",
+      dateRange: "All",
+      fileType: "All",
+      author: "All",
+    };
+    setLocalFilters(clearedFilters);
+    setLocalSearchQuery("");
+    contextClearFilters();
+    setIsSearchMode(false);
+  };
+
+  // Get the current documents to display
+  const currentDocuments = isSearchMode ? searchResults : documents;
+
+  // Sort documents locally (since context might not handle all sort options)
+  const sortedDocuments = [...currentDocuments].sort((a, b) => {
+    switch (sortBy) {
+      case "date-desc":
+        return (
+          new Date(b.createdAt || b.uploadDate) -
+          new Date(a.createdAt || a.uploadDate)
+        );
+      case "date-asc":
+        return (
+          new Date(a.createdAt || a.uploadDate) -
+          new Date(b.createdAt || b.uploadDate)
+        );
+      case "name-asc":
+        return (a.title || a.name).localeCompare(b.title || b.name);
+      case "name-desc":
+        return (b.title || b.name).localeCompare(a.title || a.name);
+      case "size-desc":
+        return (b.fileSize || 0) - (a.fileSize || 0);
+      case "size-asc":
+        return (a.fileSize || 0) - (b.fileSize || 0);
+      case "views-desc":
+        return (b.viewCount || 0) - (a.viewCount || 0);
+      default:
+        return 0;
+    }
+  });
+
+  const activeFiltersCount = Object.values(localFilters).filter(
+    (value) => value !== "All" && value !== ""
+  ).length;
+
+  // Generate category options from context categories
+  const categoryOptions = [
+    "All",
+    ...(categories || []).map((cat) =>
+      typeof cat === "string" ? cat : cat.name
+    ),
+  ];
+
   return (
-    <div className="p-6 max-w-6xl mx-auto animate-fade-in">
-      {/* Page Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-heading font-bold text-gray-800 mb-2">
-              Settings
-            </h1>
-            <p className="text-gray-600">
-              Manage your account settings and preferences
-            </p>
+    <div className="p-6 space-y-6 animate-fade-in">
+      {/* Search Header */}
+      <div className="card p-6">
+        <div className="flex flex-col lg:flex-row gap-4">
+          {/* Main Search Bar */}
+          <div className="flex-1 relative">
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input
+              type="text"
+              placeholder="Search documents, keywords, authors, or content..."
+              className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-kumbo-green-500 focus:border-kumbo-green-500 transition-all duration-300 text-lg"
+              value={localSearchQuery}
+              onChange={(e) => setLocalSearchQuery(e.target.value)}
+            />
+            {localSearchQuery && (
+              <button
+                onClick={() => setLocalSearchQuery("")}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
           </div>
 
-          {hasChanges && (
+          {/* Filter Toggle */}
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`flex items-center space-x-2 px-6 py-3 rounded-xl font-medium transition-all duration-200 ${
+              showFilters || activeFiltersCount > 0
+                ? "bg-kumbo-green-600 text-white shadow-lg"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            }`}
+          >
+            <Filter className="w-5 h-5" />
+            <span>Filters</span>
+            {activeFiltersCount > 0 && (
+              <span className="bg-white text-kumbo-green-600 text-xs px-2 py-1 rounded-full font-bold">
+                {activeFiltersCount}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* Quick Filter Tags */}
+        <div className="flex flex-wrap gap-2 mt-4">
+          {categoryOptions.slice(0, 6).map((category) => (
             <button
-              onClick={handleSave}
-              disabled={saving}
-              className="btn-primary flex items-center space-x-2"
+              key={category}
+              onClick={() => handleFilterChange({ ...localFilters, category })}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                localFilters.category === category
+                  ? "bg-kumbo-green-600 text-white shadow-md"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200 hover:scale-105"
+              }`}
             >
-              {saving ? (
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              {category}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Advanced Filters Panel */}
+      {showFilters && (
+        <SearchFilters
+          filters={localFilters}
+          setFilters={handleFilterChange}
+          onClear={clearAllFilters}
+          categories={categoryOptions}
+        />
+      )}
+
+      {/* Results Header */}
+      <div className="flex items-center justify-between bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
+            <FileText className="w-5 h-5 text-kumbo-green-600" />
+            <span className="font-semibold text-gray-800">
+              {isLoading ? (
+                <span className="flex items-center space-x-2">
+                  <Loader className="w-4 h-4 animate-spin" />
+                  <span>Loading...</span>
+                </span>
               ) : (
-                <Save className="w-5 h-5" />
+                <>
+                  {sortedDocuments.length.toLocaleString()} document
+                  {sortedDocuments.length !== 1 ? "s" : ""} found
+                </>
               )}
-              <span>{saving ? "Saving..." : "Save Changes"}</span>
+            </span>
+          </div>
+
+          {(localSearchQuery || activeFiltersCount > 0) && (
+            <button
+              onClick={clearAllFilters}
+              className="text-sm text-gray-500 hover:text-red-600 transition-colors flex items-center space-x-1"
+            >
+              <X className="w-4 h-4" />
+              <span>Clear all</span>
             </button>
           )}
         </div>
 
-        {/* Save Message */}
-        {saveMessage && (
+        <div className="flex items-center space-x-4">
+          {/* Sort Dropdown */}
+          <div className="relative">
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="appearance-none bg-white border border-gray-200 rounded-lg px-4 py-2 pr-8 text-sm focus:ring-2 focus:ring-kumbo-green-200 focus:border-kumbo-green-400"
+            >
+              <option value="date-desc">Date (Newest)</option>
+              <option value="date-asc">Date (Oldest)</option>
+              <option value="name-asc">Name (A-Z)</option>
+              <option value="name-desc">Name (Z-A)</option>
+              <option value="size-desc">Size (Largest)</option>
+              <option value="size-asc">Size (Smallest)</option>
+              <option value="views-desc">Most Viewed</option>
+            </select>
+            <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+          </div>
+
+          {/* View Mode Toggle */}
+          <div className="flex items-center bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode("grid")}
+              className={`p-2 rounded-md transition-all duration-200 ${
+                viewMode === "grid"
+                  ? "bg-white shadow-sm text-kumbo-green-600"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <Grid className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode("list")}
+              className={`p-2 rounded-md transition-all duration-200 ${
+                viewMode === "list"
+                  ? "bg-white shadow-sm text-kumbo-green-600"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <List className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Search Results */}
+      <div className="card p-6">
+        {isLoading ? (
+          <div className="text-center py-12">
+            <Loader className="w-12 h-12 text-kumbo-green-600 animate-spin mx-auto mb-4" />
+            <p className="text-gray-600">Loading documents...</p>
+          </div>
+        ) : sortedDocuments.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Search className="w-12 h-12 text-gray-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-800 mb-2">
+              No documents found
+            </h3>
+            <p className="text-gray-600 mb-4">
+              {localSearchQuery
+                ? `No results for "${localSearchQuery}". Try adjusting your search terms or filters.`
+                : "Try adjusting your filters to see more results."}
+            </p>
+            <button onClick={clearAllFilters} className="btn-primary">
+              Clear Filters
+            </button>
+          </div>
+        ) : (
           <div
-            className={`mt-4 p-4 rounded-xl flex items-center space-x-3 ${
-              saveMessage.includes("Error")
-                ? "bg-red-50 border border-red-200 text-red-700"
-                : "bg-green-50 border border-green-200 text-green-700"
-            }`}
+            className={
+              viewMode === "grid"
+                ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+                : "space-y-4"
+            }
           >
-            {saveMessage.includes("Error") ? (
-              <AlertCircle className="w-5 h-5 flex-shrink-0" />
-            ) : (
-              <CheckCircle className="w-5 h-5 flex-shrink-0" />
-            )}
-            <p>{saveMessage}</p>
+            {sortedDocuments.map((document, index) => (
+              <div
+                key={document._id || document.id}
+                className="animate-slide-up"
+                style={{ animationDelay: `${index * 0.05}s` }}
+              >
+                {viewMode === "grid" ? (
+                  <DocumentCard document={document} showStats={true} />
+                ) : (
+                  <DocumentList document={document} />
+                )}
+              </div>
+            ))}
           </div>
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        {/* Settings Navigation */}
-        <div className="lg:col-span-1">
-          <div className="card p-4 sticky top-6">
-            <nav className="space-y-1">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
-                    activeTab === tab.id
-                      ? "bg-kumbo-green-600 text-white shadow-lg"
-                      : "text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  <tab.icon className="w-5 h-5 flex-shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium">{tab.label}</p>
-                    <p
-                      className={`text-xs truncate ${
-                        activeTab === tab.id
-                          ? "text-green-100"
-                          : "text-gray-500"
-                      }`}
-                    >
-                      {tab.description}
-                    </p>
-                  </div>
-                </button>
-              ))}
-            </nav>
-          </div>
-        </div>
+      {/* Pagination */}
+      {pagination && pagination.pages > 1 && (
+        <div className="flex justify-center items-center space-x-4">
+          <button
+            onClick={() => goToPage(pagination.page - 1)}
+            disabled={pagination.page === 1}
+            className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Previous
+          </button>
 
-        {/* Settings Content */}
-        <div className="lg:col-span-3">
-          <div className="card p-6">{renderTabContent()}</div>
+          <span className="text-gray-600">
+            Page {pagination.page} of {pagination.pages}
+          </span>
+
+          <button
+            onClick={() => goToPage(pagination.page + 1)}
+            disabled={pagination.page === pagination.pages}
+            className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Next
+          </button>
         </div>
-      </div>
+      )}
     </div>
   );
 };
 
-export default SettingsPage;
+export default SearchPage;

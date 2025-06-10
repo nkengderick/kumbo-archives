@@ -1,4 +1,5 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Home,
   Search,
@@ -13,16 +14,13 @@ import {
   Shield,
   FileText,
   Clock,
+  FolderOpen,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 
-const Sidebar = ({
-  currentPage,
-  setCurrentPage,
-  sidebarOpen,
-  setSidebarOpen,
-}) => {
+const Sidebar = ({ currentPage, sidebarOpen, setSidebarOpen }) => {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
   // Define menu items based on user role
   const getMenuItems = () => {
@@ -32,12 +30,21 @@ const Sidebar = ({
         icon: Home,
         label: "Dashboard",
         description: "Overview and stats",
+        path: "/dashboard",
+      },
+      {
+        id: "documents",
+        icon: FolderOpen,
+        label: "All Documents",
+        description: "Browse all documents",
+        path: "/documents",
       },
       {
         id: "search",
         icon: Search,
         label: "Search Documents",
         description: "Find and browse files",
+        path: "/search",
       },
     ];
 
@@ -48,6 +55,7 @@ const Sidebar = ({
         icon: Upload,
         label: "Upload Documents",
         description: "Add new files",
+        path: "/upload",
       });
     }
 
@@ -56,6 +64,7 @@ const Sidebar = ({
       icon: BarChart3,
       label: "Reports & Analytics",
       description: "Usage statistics",
+      path: "/reports",
     });
 
     // Add admin-only items
@@ -65,6 +74,7 @@ const Sidebar = ({
         icon: Users,
         label: "User Management",
         description: "Manage system users",
+        path: "/users",
       });
     }
 
@@ -73,6 +83,7 @@ const Sidebar = ({
       icon: Settings,
       label: "Settings",
       description: "Preferences and config",
+      path: "/settings",
     });
 
     return baseItems;
@@ -80,9 +91,23 @@ const Sidebar = ({
 
   const menuItems = getMenuItems();
 
-  const handleMenuClick = (itemId) => {
-    setCurrentPage(itemId);
+  const handleMenuClick = (item) => {
+    navigate(item.path);
     setSidebarOpen(false); // Close sidebar on mobile after selection
+  };
+
+  const handleProfileClick = () => {
+    navigate("/profile");
+    setSidebarOpen(false);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate("/login");
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
   };
 
   const getRoleIcon = (role) => {
@@ -139,14 +164,16 @@ const Sidebar = ({
       </div>
 
       {/* Navigation Menu */}
-      <nav className="mt-6 px-4 flex-1">
+      <nav className="mt-6 px-4 flex-1 overflow-y-auto">
         <div className="space-y-2">
           {menuItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => handleMenuClick(item.id)}
-              className={`sidebar-item group ${
-                currentPage === item.id ? "sidebar-item-active" : ""
+              onClick={() => handleMenuClick(item)}
+              className={`sidebar-item group relative w-full flex items-center px-4 py-3 text-left rounded-xl transition-all duration-200 ${
+                currentPage === item.id
+                  ? "bg-white text-kumbo-green-800 shadow-lg sidebar-item-active"
+                  : "text-kumbo-green-100 hover:bg-kumbo-green-700 hover:text-white"
               }`}
               title={item.description}
             >
@@ -154,7 +181,13 @@ const Sidebar = ({
                 <item.icon className="w-5 h-5 flex-shrink-0" />
                 <div className="flex-1 text-left">
                   <span className="font-medium block">{item.label}</span>
-                  <span className="text-xs opacity-75 group-hover:opacity-100 transition-opacity">
+                  <span
+                    className={`text-xs transition-opacity ${
+                      currentPage === item.id
+                        ? "text-kumbo-green-600 opacity-75"
+                        : "opacity-75 group-hover:opacity-100"
+                    }`}
+                  >
                     {item.description}
                   </span>
                 </div>
@@ -162,7 +195,7 @@ const Sidebar = ({
 
               {/* Active indicator */}
               {currentPage === item.id && (
-                <div className="absolute right-0 top-1/2 transform -translate-y-1/2 w-1 h-8 bg-white rounded-l-full" />
+                <div className="absolute right-0 top-1/2 transform -translate-y-1/2 w-1 h-8 bg-kumbo-green-600 rounded-l-full" />
               )}
             </button>
           ))}
@@ -226,15 +259,23 @@ const Sidebar = ({
           {/* User Actions */}
           <div className="space-y-2">
             <button
-              onClick={() => handleMenuClick("settings")}
+              onClick={handleProfileClick}
               className="w-full flex items-center space-x-2 text-kumbo-green-200 hover:text-white text-sm py-2 px-3 rounded-lg hover:bg-kumbo-green-600 transition-colors"
             >
-              <Settings className="w-4 h-4" />
-              <span>Account Settings</span>
+              <User className="w-4 h-4" />
+              <span>Profile</span>
             </button>
 
             <button
-              onClick={logout}
+              onClick={() => handleMenuClick({ path: "/settings" })}
+              className="w-full flex items-center space-x-2 text-kumbo-green-200 hover:text-white text-sm py-2 px-3 rounded-lg hover:bg-kumbo-green-600 transition-colors"
+            >
+              <Settings className="w-4 h-4" />
+              <span>Settings</span>
+            </button>
+
+            <button
+              onClick={handleLogout}
               className="w-full flex items-center justify-center space-x-2 bg-red-600 hover:bg-red-700 text-white py-2 px-3 rounded-lg transition-all duration-200 font-medium text-sm"
             >
               <LogOut className="w-4 h-4" />

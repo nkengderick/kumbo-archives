@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Search,
   Filter,
@@ -8,116 +8,102 @@ import {
   X,
   ChevronDown,
   Loader,
+  Plus,
+  Upload,
+  FolderOpen,
+  RefreshCw,
+  Trash2,
+  MoreHorizontal,
 } from "lucide-react";
 import { useDocuments } from "../context/DocumentContext";
 import DocumentCard from "../components/documents/DocumentCard";
 import DocumentList from "../components/documents/DocumentList";
 import SearchFilters from "../components/documents/SearchFilters";
 
-const SearchPage = () => {
+const DocumentsPage = () => {
   const {
     documents,
-    searchResults,
     isLoading,
     error,
-    searchQuery: contextSearchQuery,
     filters: contextFilters,
     pagination,
     categories,
+    selectedDocuments,
+    hasSelection,
+    isAllSelected,
     fetchDocuments,
-    searchDocuments,
     fetchCategories,
     setFilters,
     clearFilters: contextClearFilters,
     goToPage,
+    selectDocument,
+    deselectDocument,
+    selectAllDocuments,
+    clearSelection,
+    isSelected,
+    bulkDeleteDocuments,
   } = useDocuments();
 
-  const [localSearchQuery, setLocalSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState("grid"); // 'grid' or 'list'
   const [sortBy, setSortBy] = useState("date-desc");
   const [showFilters, setShowFilters] = useState(false);
-  const [isSearchMode, setIsSearchMode] = useState(false);
-  const [loadingTimeout, setLoadingTimeout] = useState(false);
+  // eslint-disable-next-line no-unused-vars
+  const [showBulkActions, setShowBulkActions] = useState(false);
 
-  // Local filter states that sync with context
+  // Local filter states
   const [localFilters, setLocalFilters] = useState({
     category: "",
     department: "",
     dateRange: "",
     fileType: "",
     author: "",
+    status: "",
   });
 
-  // Fetch initial data on mount
+  // Load initial data
   useEffect(() => {
     const loadInitialData = async () => {
-      console.log("Starting to load initial data...");
-
-      // Set a timeout to detect if loading takes too long
-      const timeoutId = setTimeout(() => {
-        setLoadingTimeout(true);
-        console.warn("Loading is taking longer than expected...");
-      }, 10000); // 10 seconds timeout
-
       try {
-        console.log("Fetching categories...");
         await fetchCategories();
-        console.log("Categories fetched successfully");
-
-        console.log("Fetching documents...");
         await fetchDocuments();
-        console.log("Documents fetched successfully");
-
-        clearTimeout(timeoutId);
-        setLoadingTimeout(false);
       } catch (error) {
         console.error("Failed to load initial data:", error);
-        clearTimeout(timeoutId);
-        setLoadingTimeout(false);
       }
     };
 
-    // Only load if we don't already have documents
     if (documents.length === 0 && !isLoading) {
       loadInitialData();
     }
-  }, []); // Empty dependency array to run only once
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Sync local filters with context filters
   useEffect(() => {
     setLocalFilters({
       category: contextFilters.category || "",
       department: contextFilters.department || "",
-      dateRange: "", // This needs to be mapped from contextFilters
+      dateRange: "",
       fileType: contextFilters.fileType || "",
       author: contextFilters.author || "",
+      status: contextFilters.status || "",
     });
   }, [contextFilters]);
 
-  // Handle search with debouncing
+  // Apply search and filters
   useEffect(() => {
-    if (!localSearchQuery.trim()) {
-      setIsSearchMode(false);
-      return;
-    }
+    const timeoutId = setTimeout(() => {
+      const filterParams = {
+        ...contextFilters,
+        ...(searchQuery && { search: searchQuery }),
+        sortBy,
+      };
 
-    const timeoutId = setTimeout(async () => {
-      console.log("Searching for:", localSearchQuery);
-      try {
-        setIsSearchMode(true);
-        await searchDocuments(localSearchQuery, {
-          ...contextFilters,
-          sortBy,
-        });
-        console.log("Search completed");
-      } catch (error) {
-        console.error("Search failed:", error);
-        setIsSearchMode(false);
-      }
+      fetchDocuments(filterParams);
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [localSearchQuery, sortBy]); // Removed contextFilters and functions from dependencies
+  }, [searchQuery, contextFilters, sortBy, fetchDocuments]);
 
   // Apply local filters to context
   const applyFilters = useCallback(
@@ -128,7 +114,7 @@ const SearchPage = () => {
           newFilters.department === "All" ? "" : newFilters.department,
         fileType: newFilters.fileType === "All" ? "" : newFilters.fileType,
         author: newFilters.author === "All" ? "" : newFilters.author,
-        // Map date range to actual dates
+        status: newFilters.status === "All" ? "" : newFilters.status,
         dateFrom: getDateFromRange(newFilters.dateRange),
         dateTo: newFilters.dateRange === "All" ? "" : new Date().toISOString(),
       };
@@ -179,18 +165,15 @@ const SearchPage = () => {
       dateRange: "All",
       fileType: "All",
       author: "All",
+      status: "All",
     };
     setLocalFilters(clearedFilters);
-    setLocalSearchQuery("");
+    setSearchQuery("");
     contextClearFilters();
-    setIsSearchMode(false);
   };
 
-  // Get the current documents to display
-  const currentDocuments = isSearchMode ? searchResults : documents;
-
-  // Sort documents locally (since context might not handle all sort options)
-  const sortedDocuments = [...currentDocuments].sort((a, b) => {
+  // Sort documents locally
+  const sortedDocuments = [...documents].sort((a, b) => {
     switch (sortBy) {
       case "date-desc":
         return (
@@ -217,36 +200,116 @@ const SearchPage = () => {
     }
   });
 
+  // Handle document actions
+  const handleDocumentView = (document) => {
+    // Navigate to document detail page
+    window.location.href = `/documents/${document._id}`;
+  };
+
+  const handleDocumentDownload = async (document) => {
+    try {
+      // Implement download logic
+      console.log("Downloading document:", document.title);
+    } catch (error) {
+      console.error("Download failed:", error);
+    }
+  };
+
+  const handleDocumentStar = async (document) => {
+    try {
+      // Implement star toggle logic
+      console.log("Toggling star for document:", document.title);
+    } catch (error) {
+      console.error("Star toggle failed:", error);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (
+      window.confirm(
+        `Are you sure you want to delete ${selectedDocuments.length} documents?`
+      )
+    ) {
+      try {
+        await bulkDeleteDocuments();
+        setShowBulkActions(false);
+      } catch (error) {
+        console.error("Bulk delete failed:", error);
+      }
+    }
+  };
+
+  const handleRefresh = () => {
+    fetchDocuments();
+  };
+
   const activeFiltersCount = Object.values(localFilters).filter(
     (value) => value !== "All" && value !== ""
   ).length;
 
-  // Generate category options from context categories
+  // Generate category options
   const categoryOptions = [
     "All",
-    ...(categories || []).map((cat) =>
-      typeof cat === "string" ? cat : cat.name
-    ),
+    ...(categories || [])
+      .map((cat) => {
+        if (typeof cat === "string") {
+          return cat;
+        } else if (cat && typeof cat === "object" && cat.name) {
+          return cat.name;
+        }
+        return String(cat);
+      })
+      .filter(Boolean),
   ];
 
   return (
     <div className="p-6 space-y-6 animate-fade-in">
-      {/* Search Header */}
+      {/* Page Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-800">Documents</h1>
+          <p className="text-gray-600 mt-1">
+            Manage and browse archived documents
+          </p>
+        </div>
+
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={handleRefresh}
+            className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            <span>Refresh</span>
+          </button>
+
+          <button className="flex items-center space-x-2 px-4 py-2 bg-kumbo-green-600 text-white rounded-lg hover:bg-kumbo-green-700 transition-colors">
+            <Upload className="w-4 h-4" />
+            <span>Upload</span>
+          </button>
+
+          <button className="flex items-center space-x-2 px-4 py-2 bg-kumbo-green-600 text-white rounded-lg hover:bg-kumbo-green-700 transition-colors">
+            <Plus className="w-4 h-4" />
+            <span>New Document</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Search and Filters */}
       <div className="card p-6">
         <div className="flex flex-col lg:flex-row gap-4">
-          {/* Main Search Bar */}
+          {/* Search Bar */}
           <div className="flex-1 relative">
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
               placeholder="Search documents, keywords, authors, or content..."
               className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-kumbo-green-500 focus:border-kumbo-green-500 transition-all duration-300 text-lg"
-              value={localSearchQuery}
-              onChange={(e) => setLocalSearchQuery(e.target.value)}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
-            {localSearchQuery && (
+            {searchQuery && (
               <button
-                onClick={() => setLocalSearchQuery("")}
+                onClick={() => setSearchQuery("")}
                 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
               >
                 <X className="w-5 h-5" />
@@ -301,10 +364,55 @@ const SearchPage = () => {
         />
       )}
 
+      {/* Bulk Actions Bar */}
+      {hasSelection && (
+        <div className="bg-kumbo-green-50 border border-kumbo-green-200 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <span className="text-kumbo-green-700 font-medium">
+                {selectedDocuments.length} document
+                {selectedDocuments.length !== 1 ? "s" : ""} selected
+              </span>
+              <button
+                onClick={clearSelection}
+                className="text-kumbo-green-600 hover:text-kumbo-green-800 text-sm underline"
+              >
+                Clear selection
+              </button>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handleBulkDelete}
+                className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Delete Selected</span>
+              </button>
+
+              <button className="flex items-center space-x-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors">
+                <MoreHorizontal className="w-4 h-4" />
+                <span>More Actions</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Results Header */}
       <div className="flex items-center justify-between bg-white p-4 rounded-xl shadow-sm border border-gray-100">
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
+            {/* Select All Checkbox */}
+            <input
+              type="checkbox"
+              checked={isAllSelected}
+              onChange={() =>
+                isAllSelected ? clearSelection() : selectAllDocuments()
+              }
+              className="w-4 h-4 text-kumbo-green-600 border-gray-300 rounded focus:ring-kumbo-green-500"
+            />
+
             <FileText className="w-5 h-5 text-kumbo-green-600" />
             <span className="font-semibold text-gray-800">
               {isLoading ? (
@@ -321,7 +429,7 @@ const SearchPage = () => {
             </span>
           </div>
 
-          {(localSearchQuery || activeFiltersCount > 0) && (
+          {(searchQuery || activeFiltersCount > 0) && (
             <button
               onClick={clearAllFilters}
               className="text-sm text-gray-500 hover:text-red-600 transition-colors flex items-center space-x-1"
@@ -377,26 +485,12 @@ const SearchPage = () => {
         </div>
       </div>
 
-      {/* Search Results */}
+      {/* Documents Grid/List */}
       <div className="card p-6">
         {isLoading ? (
           <div className="text-center py-12">
             <Loader className="w-12 h-12 text-kumbo-green-600 animate-spin mx-auto mb-4" />
             <p className="text-gray-600">Loading documents...</p>
-            {loadingTimeout && (
-              <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <p className="text-yellow-800 text-sm">
-                  Loading is taking longer than expected. Please check your
-                  network connection or try refreshing the page.
-                </p>
-                <button
-                  onClick={() => window.location.reload()}
-                  className="mt-2 text-yellow-600 hover:text-yellow-800 underline text-sm"
-                >
-                  Refresh Page
-                </button>
-              </div>
-            )}
           </div>
         ) : error ? (
           <div className="text-center py-12">
@@ -407,32 +501,26 @@ const SearchPage = () => {
               Error Loading Documents
             </h3>
             <p className="text-gray-600 mb-4">{error}</p>
-            <button
-              onClick={() => {
-                setLoadingTimeout(false);
-                fetchDocuments();
-              }}
-              className="btn-primary"
-            >
+            <button onClick={handleRefresh} className="btn-primary">
               Try Again
             </button>
           </div>
         ) : sortedDocuments.length === 0 ? (
           <div className="text-center py-12">
             <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Search className="w-12 h-12 text-gray-400" />
+              <FolderOpen className="w-12 h-12 text-gray-400" />
             </div>
             <h3 className="text-lg font-semibold text-gray-800 mb-2">
               No documents found
             </h3>
             <p className="text-gray-600 mb-4">
-              {localSearchQuery
-                ? `No results for "${localSearchQuery}". Try adjusting your search terms or filters.`
-                : "Try adjusting your filters to see more results."}
+              {searchQuery || activeFiltersCount > 0
+                ? "Try adjusting your search terms or filters."
+                : "Upload your first document to get started."}
             </p>
-            <button onClick={clearAllFilters} className="btn-primary">
-              Clear Filters
-            </button>
+            {!(searchQuery || activeFiltersCount > 0) && (
+              <button className="btn-primary">Upload Document</button>
+            )}
           </div>
         ) : (
           <div
@@ -443,7 +531,7 @@ const SearchPage = () => {
             }
           >
             {sortedDocuments.map((document, index) => {
-              // Ensure document has required fields
+              // Normalize document data
               const normalizedDocument = {
                 ...document,
                 _id: document._id || document.id,
@@ -470,21 +558,53 @@ const SearchPage = () => {
                 viewCount: document.viewCount || 0,
                 downloadCount: document.downloadCount || 0,
                 isStarred: document.isStarred || false,
+                isSelected: isSelected(document._id || document.id),
               };
 
               return (
                 <div
                   key={normalizedDocument._id}
-                  className="animate-slide-up"
+                  className="animate-slide-up relative"
                   style={{ animationDelay: `${index * 0.05}s` }}
                 >
+                  {/* Selection Checkbox (for grid view) */}
+                  {viewMode === "grid" && (
+                    <div className="absolute top-2 left-2 z-10">
+                      <input
+                        type="checkbox"
+                        checked={normalizedDocument.isSelected}
+                        onChange={() =>
+                          normalizedDocument.isSelected
+                            ? deselectDocument(normalizedDocument._id)
+                            : selectDocument(normalizedDocument._id)
+                        }
+                        className="w-4 h-4 text-kumbo-green-600 border-gray-300 rounded focus:ring-kumbo-green-500"
+                      />
+                    </div>
+                  )}
+
                   {viewMode === "grid" ? (
                     <DocumentCard
                       document={normalizedDocument}
                       showStats={true}
+                      onView={handleDocumentView}
+                      onDownload={handleDocumentDownload}
+                      onStar={handleDocumentStar}
                     />
                   ) : (
-                    <DocumentList document={normalizedDocument} />
+                    <DocumentList
+                      document={normalizedDocument}
+                      onView={handleDocumentView}
+                      onDownload={handleDocumentDownload}
+                      onStar={handleDocumentStar}
+                      showSelection={true}
+                      isSelected={normalizedDocument.isSelected}
+                      onSelect={() =>
+                        normalizedDocument.isSelected
+                          ? deselectDocument(normalizedDocument._id)
+                          : selectDocument(normalizedDocument._id)
+                      }
+                    />
                   )}
                 </div>
               );
@@ -504,7 +624,26 @@ const SearchPage = () => {
             Previous
           </button>
 
-          <span className="text-gray-600">
+          <div className="flex items-center space-x-2">
+            {Array.from({ length: Math.min(pagination.pages, 5) }, (_, i) => {
+              const page = i + 1;
+              return (
+                <button
+                  key={page}
+                  onClick={() => goToPage(page)}
+                  className={`px-3 py-1 rounded-md text-sm ${
+                    pagination.page === page
+                      ? "bg-kumbo-green-600 text-white"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
+                >
+                  {page}
+                </button>
+              );
+            })}
+          </div>
+
+          <span className="text-gray-600 text-sm">
             Page {pagination.page} of {pagination.pages}
           </span>
 
@@ -521,4 +660,4 @@ const SearchPage = () => {
   );
 };
 
-export default SearchPage;
+export default DocumentsPage;

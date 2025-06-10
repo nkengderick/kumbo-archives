@@ -9,7 +9,18 @@ import {
   Share2,
   MoreVertical,
 } from "lucide-react";
-import { fileTypeIcons } from "../../data/mockData";
+
+// File type icons mapping
+const fileTypeIcons = {
+  PDF: "📄",
+  DOCX: "📝",
+  XLSX: "📊",
+  PPTX: "📋",
+  JPG: "🖼️",
+  PNG: "🖼️",
+  MP4: "🎥",
+  MP3: "🎵",
+};
 
 const DocumentList = ({ document, onView, onDownload, onStar }) => {
   const getCategoryColor = (category) => {

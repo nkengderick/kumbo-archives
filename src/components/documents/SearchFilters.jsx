@@ -1,8 +1,55 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { X, Calendar, User, FileText, Building, Filter } from "lucide-react";
-import { documentCategories, departments } from "../../data/mockData";
+import { useDocuments } from "../../context/DocumentContext";
+
+const departments = [
+  "Administration",
+  "Finance",
+  "Legal Affairs",
+  "Cultural Affairs",
+  "Public Works",
+  "Education",
+  "Health",
+  "Land Registry",
+  "Planning",
+  "External",
+];
 
 const SearchFilters = ({ filters, setFilters, onClear }) => {
+  const { fetchCategories } = useDocuments();
+  const [categories, setCategories] = useState(["All"]);
+
+  // Fetch categories on mount
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const categoryData = await fetchCategories();
+        const categoryNames = ["All", ...categoryData.map((cat) => cat.name)];
+        setCategories(categoryNames);
+      } catch (error) {
+        console.error("Failed to load categories:", error);
+        // Fallback to hardcoded categories
+        setCategories([
+          "All",
+          "Administrative",
+          "Financial",
+          "Legal",
+          "Cultural",
+          "Infrastructure",
+          "Education",
+          "Healthcare",
+          "Heritage",
+          "Planning",
+          "Environmental",
+          "Social",
+          "Economic",
+        ]);
+      }
+    };
+
+    loadCategories();
+  }, [fetchCategories]);
+
   const updateFilter = (key, value) => {
     setFilters((prev) => ({
       ...prev,
@@ -61,7 +108,7 @@ const SearchFilters = ({ filters, setFilters, onClear }) => {
             onChange={(e) => updateFilter("category", e.target.value)}
             className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-kumbo-green-200 focus:border-kumbo-green-400 transition-all duration-200"
           >
-            {documentCategories.map((category) => (
+            {categories?.map((category) => (
               <option key={category} value={category}>
                 {category}
               </option>

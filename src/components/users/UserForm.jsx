@@ -10,7 +10,19 @@ import {
   Save,
   AlertCircle,
 } from "lucide-react";
-import { departments } from "../../data/mockData";
+
+const departments = [
+  "Administration",
+  "Finance",
+  "Legal Affairs",
+  "Cultural Affairs",
+  "Public Works",
+  "Education",
+  "Health",
+  "Land Registry",
+  "Planning",
+  "External",
+];
 
 const UserForm = ({ user, onSubmit, onCancel }) => {
   const [formData, setFormData] = useState({
